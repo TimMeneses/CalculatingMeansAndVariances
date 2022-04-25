@@ -3,6 +3,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.TreeMap;
@@ -18,6 +21,7 @@ public class MeansVariances {
     private static final String OUTPUT_PROBE_MEAN_VARIANCE = "\\swapsProbeMeansAndVariance.txt";
     private static final String OUTPUT_SWAP_PROBABILITY = "\\swapsProbability.txt";
     private static final String OUTPUT_WORKNUDGED_PROBABILITY = "\\workNudgedProbability.txt";
+    private static final String OUTPUT_PERCENTILE = "\\percentile.txt";
     private static final Double THRESHOLD = 1.0;
 
     public static void main(String[] args) throws IOException {
@@ -30,82 +34,65 @@ public class MeansVariances {
                 //calcMeanAndVariance(OUTPUTS_DIRECTORY + "\\" + str);
                 //probabilityWorkNudgedCalc((OUTPUTS_DIRECTORY + "\\" + str));
                 //probabilitySwapCalc(OUTPUTS_DIRECTORY + "\\" + str);
-                calcProbes(OUTPUTS_DIRECTORY + "\\" + str);
-                renameDir(OUTPUTS_DIRECTORY + "\\" + str);
+                //calcProbes(OUTPUTS_DIRECTORY + "\\" + str);
+                calcPercentile(OUTPUTS_DIRECTORY + "\\" + str, 5);
+                //renameDir(OUTPUTS_DIRECTORY + "\\" + str);
             } catch (FileNotFoundException e) {
                 System.out.println("Couldn't open file");
             }
         }
     }
 
-     private static void calcProbes(String filePath) throws IOException {
-         System.out.println("\n\n-----------------------Calculating Probes " + filePath + "-----------------------------------");
-         //open the workload.txt in this folder:
-         File file = new File(filePath + PROBE_FILE);
-         Scanner readFile = new Scanner(file);
+    private static void calcPercentile(String filePath, int percentile) throws IOException {
+        System.out.println("\n\n-----------------------Calculating Percentile " + filePath + "-----------------------------------");
+        //open the workload.txt in this folder:
+        File file = new File(filePath + WL_FILE);
+        Scanner readFile = new Scanner(file);
+        
+        /*--------------------------------FILE READING -------------------------------*/
+        //ignore header.
+        readFile.nextLine();
+        PercentileCalc percCalc = new PercentileCalc(percentile);
+
+        while(readFile.hasNext()) {
+            for (int i = 0; i < 6; i++) {
+                readFile.next();// ignore all colums before response time
+            }
+            Double response = readFile.nextDouble();
+            Double slowDown = readFile.nextDouble();
+            readFile.next();
+            Integer swaps = readFile.nextInt();
+            if(swaps < 0) {
+                swaps = 0;
+            }
+            readFile.next();
+            Double workNudged = readFile.nextDouble();
+            percCalc.addToList(response, slowDown, swaps, workNudged); 
+        }
+        percCalc.sortLists();
+
+          /**--------------------------------OUTPUT WRITING---------------------------------------------------- */
+
+          File outputFile = new File(filePath + OUTPUT_PERCENTILE);
+          BufferedWriter output = new BufferedWriter((new FileWriter(outputFile)));
+        
+          output.write("RV\t\t\tMean-of-"+percentile+"-percentile" + "\t\tVariance\t\tTotalJobs\t\t" + "Mean-of-"+(100-percentile)+"percentile\t\tVariance\t\tTotalJobs\n");
+          output.write("Response-Time\t\t" + percCalc.calculateResponse());
+          output.write("SlowDown\t\t" + percCalc.calculateSlowDown());
+          output.write("NumberOfNudge\t\t" + percCalc.calculateSwaps());
+          output.write("TotalWorkNudged\t\t" + percCalc.calculateWorkNudged());
+        
+          output.close();
+          readFile.close();
+    }
 
 
-         //ignore header.
-         readFile.nextLine();
-
-         Map<Double, Job> jobProbes = new TreeMap<>();
-         Double size = 0.0;
-
-         while(readFile.hasNext()) {
-               readFile.next();  // ignore job id
-
-             size = readFile.nextDouble();
-             if (jobProbes.containsKey(size)) {
-                 Job currentJob = jobProbes.get(size);
-
-                 //ignore all columns up to the number of swaps
-                 for(int i = 0; i < 7; i++) {
-                     readFile.next();
-                 }
-
-                 Integer swap = readFile.nextInt();
-                 Double workSkipped = readFile.nextDouble();
-                 Double workNudged = readFile.nextDouble();
-                 currentJob.addToList(THRESHOLD, size, swap, workSkipped, workNudged);
-
-             } else {
-                 Job newJob = new Job(true);
-                 newJob.setProbeSize(size);
-
-                 for(int i = 0; i < 7; i++) {
-                         readFile.next();
-                     }
-
-                Integer swap = readFile.nextInt();
-                Double workSkipped = readFile.nextDouble();
-                Double workNudged = readFile.nextDouble();
-                newJob.addToList(THRESHOLD, size, swap, workSkipped, workNudged);
-
-                jobProbes.put(size, newJob);
-             }  
-         }
 
 
-         File outputFile = new File(filePath + OUTPUT_PROBE_MEAN_VARIANCE);
-         BufferedWriter output = new BufferedWriter((new FileWriter(outputFile)));
 
-        output.write("Size       MeanSwaps        VarianceSwaps         MaxSwaps         Mean-Work-Skipped          Var-Work-Skipped          Max-Work-Skipped         Mean-Work-Nudged         Var-Work-Nudged          Max-Work-Nudged       No-Of-Samples\n");
-        for (Map.Entry<Double, Job> entry : jobProbes.entrySet())  {
-             Double key = entry.getKey();
-             Job current = entry.getValue();
-
-             System.out.println("Key: " + key);
-             current.calculate();
-             output.write(key + current.ProbeOutput());
-
-
-         }
-
-         output.close();
-         readFile.close();
-
-     }
-
+/**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
+     /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
+     /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
      private static void probabilityWorkNudgedCalc(String filePath) throws IOException {
         System.out.println("\n\n-----------------------Calculating Probability of Work Nudged " + filePath + "-----------------------------------");
         File file = new File(filePath + WL_FILE);
@@ -199,6 +186,83 @@ public class MeansVariances {
 
 
 
+    /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
+    /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
+    /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
+     private static void calcProbes(String filePath) throws IOException {
+         System.out.println("\n\n-----------------------Calculating Probes " + filePath + "-----------------------------------");
+         //open the workload.txt in this folder:
+         File file = new File(filePath + PROBE_FILE);
+         Scanner readFile = new Scanner(file);
+
+
+         //ignore header.
+         readFile.nextLine();
+
+         Map<Double, Job> jobProbes = new TreeMap<>();
+         Double size = 0.0;
+
+         while(readFile.hasNext()) {
+               readFile.next();  // ignore job id
+
+             size = readFile.nextDouble();
+             if (jobProbes.containsKey(size)) {
+                 Job currentJob = jobProbes.get(size);
+
+                 //ignore all columns up to the number of swaps
+                 for(int i = 0; i < 7; i++) {
+                     readFile.next();
+                 }
+
+                 Integer swap = readFile.nextInt();
+                 Double workSkipped = readFile.nextDouble();
+                 Double workNudged = readFile.nextDouble();
+                 currentJob.addToList(THRESHOLD, size, swap, workSkipped, workNudged);
+
+             } else {
+                 Job newJob = new Job(true);
+                 newJob.setProbeSize(size);
+
+                 for(int i = 0; i < 7; i++) {
+                         readFile.next();
+                     }
+
+                Integer swap = readFile.nextInt();
+                Double workSkipped = readFile.nextDouble();
+                Double workNudged = readFile.nextDouble();
+                newJob.addToList(THRESHOLD, size, swap, workSkipped, workNudged);
+
+                jobProbes.put(size, newJob);
+             }  
+         }
+
+
+         File outputFile = new File(filePath + OUTPUT_PROBE_MEAN_VARIANCE);
+         BufferedWriter output = new BufferedWriter((new FileWriter(outputFile)));
+
+        output.write("Size       MeanSwaps        VarianceSwaps         MaxSwaps         Mean-Work-Skipped          Var-Work-Skipped          Max-Work-Skipped         Mean-Work-Nudged         Var-Work-Nudged          Max-Work-Nudged       No-Of-Samples\n");
+        for (Map.Entry<Double, Job> entry : jobProbes.entrySet())  {
+             Double key = entry.getKey();
+             Job current = entry.getValue();
+
+             System.out.println("Key: " + key);
+             current.calculate();
+             output.write(key + current.ProbeOutput());
+
+
+         }
+
+         output.close();
+         readFile.close();
+
+     }
+
+
+     
+
+    /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
+    /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
+    /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
      private static void probabilitySwapCalc(String filePath) throws IOException {
         System.out.println("\n\n-----------------------Calculating Probability of Swaps " + filePath + "-----------------------------------");
         File file = new File(filePath + WL_FILE);
@@ -282,7 +346,9 @@ public class MeansVariances {
 
 
 
-
+    /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
+    /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
+    /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
     private static void calcMeanAndVariance(String filePath) throws IOException {
 
         System.out.println("\n\n-----------------------Calculating Means and Variances for: " + filePath + "-----------------------------------");
@@ -338,6 +404,9 @@ public class MeansVariances {
     }
 
 
+    /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
+    /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
+    /**-----------------------------------------------------------------------------------------------------------------------------------------------------*/
     private static void renameDir(String filePath) throws FileNotFoundException {
         File sourceFile = new File(filePath);
 
