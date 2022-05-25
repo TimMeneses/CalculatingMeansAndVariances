@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.TreeMap;
@@ -22,6 +23,7 @@ public class MeansVariances {
     private static final String OUTPUT_SWAP_PROBABILITY = "\\swapsProbability.txt";
     private static final String OUTPUT_WORKNUDGED_PROBABILITY = "\\workNudgedProbability.txt";
     private static final String OUTPUT_PERCENTILE = "\\percentile.txt";
+    private static final String OUTPUT_RESPONSE_PROBABILITY = "\\responseAndSDTimeProb.txt";
     private static final Double THRESHOLD = 1.0;
 
     public static void main(String[] args) throws IOException {
@@ -35,13 +37,107 @@ public class MeansVariances {
                 //probabilityWorkNudgedCalc((OUTPUTS_DIRECTORY + "\\" + str));
                 //probabilitySwapCalc(OUTPUTS_DIRECTORY + "\\" + str);
                 //calcProbes(OUTPUTS_DIRECTORY + "\\" + str);
-                calcPercentile(OUTPUTS_DIRECTORY + "\\" + str, 5);
+                //calcPercentile(OUTPUTS_DIRECTORY + "\\" + str, 1);
                 //renameDir(OUTPUTS_DIRECTORY + "\\" + str);
+                calculateResponseProbability(OUTPUTS_DIRECTORY + "\\" + str, 20);
             } catch (FileNotFoundException e) {
                 System.out.println("Couldn't open file");
             }
         }
     }
+
+    private static void calculateResponseProbability(String filePath, int range) throws IOException {
+        System.out.println("\n\n-----------------------Calculating Response Time Probability " + filePath + "-----------------------------------");
+        //open the workload.txt in this folder:
+        File file = new File(filePath + WL_FILE);
+        Scanner readFile = new Scanner(file);
+
+         
+        /*--------------------------------FILE READING -------------------------------*/
+        //ignore header.
+        readFile.nextLine();
+        ArrayList <Double> responseTime = new ArrayList<>();
+        ArrayList <Double> slowDown = new ArrayList<>();
+        while(readFile.hasNext()) {
+            for (int i = 0; i < 6; i++) {
+                readFile.next();// ignore all colums before response time
+            }
+            responseTime.add(readFile.nextDouble());
+            slowDown.add(readFile.nextDouble());
+
+            for(int i =0; i< 4; i++) {
+                readFile.next();
+            }
+        }
+
+        Map<Double, Integer> responseCountProbability = new TreeMap<Double, Integer>();
+        Map<Double, Integer> sdCountProbability = new TreeMap<Double, Integer>();
+        Double rT = 0.0;
+        for(int i = 0; i <= range; i++) {
+            responseCountProbability.put(rT, 0);
+            sdCountProbability.put(rT, 0);
+            rT+=1;
+        }
+      
+
+        for(Double response: responseTime) {
+
+            for(Map.Entry<Double, Integer> entry : responseCountProbability.entrySet()) {
+                Double key = entry.getKey();
+                if (response >= key) {
+                    responseCountProbability.merge(key, 1, Integer::sum);
+                }
+            }
+        }
+
+
+        for(Double sd: slowDown) {
+
+            for(Map.Entry<Double, Integer> entry : sdCountProbability.entrySet()) {
+                Double key = entry.getKey();
+                if (sd >= key) {
+                    sdCountProbability.merge(key, 1, Integer::sum);
+                }
+            }
+        }
+
+
+  /**--------------------------------OUTPUT WRITING---------------------------------------------------- */
+
+    File outputFile = new File(filePath + OUTPUT_RESPONSE_PROBABILITY);
+    BufferedWriter output = new BufferedWriter((new FileWriter(outputFile)));
+    output.write("Response-Time \t\t\t Total \t\t\t Probability\n");
+    
+    for(Map.Entry<Double, Integer> entry : responseCountProbability.entrySet()) {
+            Double key = entry.getKey();
+            Integer value = entry.getValue();
+
+            output.write(key + "\t\t\t" + value + "\t\t\t" + ((double) value / responseTime.size()) + "\n");
+
+        }
+
+    output.write("\n\nSlowDown-Time \t\t\t Total \t\t\t Probability\n");
+    for(Map.Entry<Double, Integer> entry : sdCountProbability.entrySet()) {
+        Double key = entry.getKey();
+        Integer value = entry.getValue();
+
+        output.write(key + "\t\t\t" + value + "\t\t\t" + ((double) value / slowDown.size()) + "\n");
+
+    }
+
+
+
+
+
+
+
+
+
+    output.close();
+    readFile.close();
+    }
+
+
 
     private static void calcPercentile(String filePath, int percentile) throws IOException {
         System.out.println("\n\n-----------------------Calculating Percentile " + filePath + "-----------------------------------");
