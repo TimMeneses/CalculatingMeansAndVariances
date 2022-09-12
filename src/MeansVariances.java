@@ -13,7 +13,8 @@ import java.util.TreeMap;
 
 public class MeansVariances {
     
-    private static final String OUTPUTS_DIRECTORY = "D:\\Coding\\c++\\Research\\data\\outputs";
+    //private static final String OUTPUTS_DIRECTORY = "D:\\Coding\\c++\\Research\\data\\outputs";
+    private static final String OUTPUTS_DIRECTORY = "C:\\Coding\\GITREPO\\S3PrivateBase\\data\\outputs";
     //private static final String OUTPUTS_DIRECTORY = "E:\\RESEARCH\\Raw Data\\New Experiments\\avg swaps";
     private static final String WL_FILE = "\\workloadreport.txt";
     private static final String PROBE_FILE = "\\probereport.txt";
@@ -33,13 +34,13 @@ public class MeansVariances {
 
         for(String str: fileList) {
             try {
-                //calcMeanAndVariance(OUTPUTS_DIRECTORY + "\\" + str);
+                calcMeanAndVariance(OUTPUTS_DIRECTORY + "\\" + str);
                 //probabilityWorkNudgedCalc((OUTPUTS_DIRECTORY + "\\" + str));
                 //probabilitySwapCalc(OUTPUTS_DIRECTORY + "\\" + str);
                 //calcProbes(OUTPUTS_DIRECTORY + "\\" + str);
                 //calcPercentile(OUTPUTS_DIRECTORY + "\\" + str, 1);
-                //renameDir(OUTPUTS_DIRECTORY + "\\" + str);
-                calculateResponseProbability(OUTPUTS_DIRECTORY + "\\" + str, 20);
+                renameDir(OUTPUTS_DIRECTORY + "\\" + str);
+                //calculateResponseProbability(OUTPUTS_DIRECTORY + "\\" + str, 45);
             } catch (FileNotFoundException e) {
                 System.out.println("Couldn't open file");
             }
@@ -58,13 +59,19 @@ public class MeansVariances {
         readFile.nextLine();
         ArrayList <Double> responseTime = new ArrayList<>();
         ArrayList <Double> slowDown = new ArrayList<>();
+        int totalJobs = 0;
         while(readFile.hasNext()) {
+            totalJobs++;
             for (int i = 0; i < 6; i++) {
                 readFile.next();// ignore all colums before response time
             }
+            if (totalJobs <= 1000000) {
             responseTime.add(readFile.nextDouble());
             slowDown.add(readFile.nextDouble());
-
+            } else {
+                readFile.nextDouble();
+                readFile.nextDouble();
+            }
             for(int i =0; i< 4; i++) {
                 readFile.next();
             }
@@ -516,7 +523,7 @@ public class MeansVariances {
                 // WORKLOAD	EXPONENTIAL	1000000		0.8		1         5
                 // LOGGER		BasicLogger	CONCISE		PROMTWRITE    6
                 // PROBES		2		0.02		0.98		1.06  7
-                for(int i = 0; i < 5 ; i++) {   //row
+                for(int i = 0; i < 2 ; i++) {   //row
                     readFile.nextLine();
                 }
 
@@ -525,7 +532,7 @@ public class MeansVariances {
                 }
                 
 
-     String newName = sourceFile.getParent() + "\\E[S]=" + readFile.next();
+     String newName = sourceFile.getParent() + "\\Threshold=" + readFile.next();
      System.out.println(newName);
      readFile.close();
 
